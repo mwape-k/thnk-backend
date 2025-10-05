@@ -13,3 +13,13 @@ app.use('/api', scrapeRoutes);
 app.listen(process.env.PORT || 5000, () => {
     console.log(`Server running on port ${process.env.PORT || 5000}`);
 });
+
+/* 
+TODO: 
+- testing 
+- AI integration for Scoring 
+- AI integration for tagging 
+- deeper 'thnk' functionality
+- Firebase user Authentication 
+- user search/history storing 
+*/
