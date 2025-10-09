@@ -16,7 +16,7 @@ async function getTagsFromAI(text) {
   const responseSchema = {
     type: Type.ARRAY,
     items: {
-      type: TypeSTRING,
+      type: Type.STRING,
     },
   };
 

@@ -14,9 +14,12 @@ exports.scrapeAndSave = async (req, res) => {
   const content = new ScrapedContent(result);
   await content.save();
 
+  // Use dummy userId if req.user is missing
+  const userId = req.user?.uid || "testUser123";
+
   // Record search history
   await SearchHistory.create({
-    userId: req.user.uid, // From Firebase auth middleware
+    userId: userId, // From Firebase auth middleware
     query: url,
     results: [content._id],  // Storing reference to scraped content (MongoDB ObjectId)
     timestamp: new Date()
