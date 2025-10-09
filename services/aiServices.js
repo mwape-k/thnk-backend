@@ -1,5 +1,5 @@
-import ai from "../config/gemini.js";
-import { Type } from "@google/genai";
+const ai = require("../config/gemini.js");
+const { Type } = require("@google/genai");
 
 //this is a scrub. later  integrate AI
 async function getNeutralityAndSentiment(text) {

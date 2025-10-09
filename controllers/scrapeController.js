@@ -1,5 +1,5 @@
 const ScrapedContent = require("../models/ScrapedContent");
-const scrapeWebsite = require("../services/scraper");
+const scrapeWebsite = require("../services/scrapper");
 const SearchHistory = require("../models/SearchHistory");
 
 exports.scrapeAndSave = async (req, res) => {

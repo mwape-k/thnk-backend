@@ -1,7 +1,7 @@
-const express = require('express');
+const express = require("express");
+const { scrapeAndSave } = require("../controllers/scrapeController");
 const router = express.Router();
-const { scrapeAndSave } = require('../controllers/scrapeController'); 
 
-router.post('/scrape', scrapeAndSave); 
+router.post('/scrape', scrapeAndSave);
 
-module.exports = router; 
+module.exports = router;

@@ -1,5 +1,4 @@
 //verifies the ID tokens sent by clients that have already authenticated via Firebase  
-//
 const admin = require('../config/firebase');
 
 async function authenticateToken(req, res, next) {

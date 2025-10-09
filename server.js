@@ -2,8 +2,11 @@ const express = require('express');
 const connectDB = require('./config/db');
 
 //routes import 
+console.log("importing routes");
 const scrapeRoutes = require('./routes/scrapeRoutes');
+console.log("scrapes importd: ", scrapeRoutes);
 const thnkRoutes = require("./controllers/thnkController");
+console.log("thnk importd: ", thnkRoutes);
 
 require('dotenv').config(); 
 
