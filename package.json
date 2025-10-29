@@ -20,11 +20,12 @@
   },
   "homepage": "https://github.com/mwape-k/thnk-backend#readme",
   "dependencies": {
-    "@google/genai": "^1.22.0",
+    "@google/genai": "^1.27.0",
     "axios": "^1.12.2",
     "cheerio": "^1.1.2",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
+    "express-rate-limit": "^8.1.0",
     "firebase-admin": "^13.5.0",
     "mongoose": "^8.19.0",
     "swagger-jsdoc": "^6.2.8",

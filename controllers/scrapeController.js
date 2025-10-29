@@ -6,31 +6,29 @@ exports.scrapeAndSave = async (req, res) => {
   const { url } = req.body;
   if (!url) return res.status(400).json({ error: "URL required" });
 
-  // Authenticate user assumed by middleware; req.user.uid available
-  const result = await scrapeWebsite(url);
-  if (!result) return res.status(500).json({ error: "Scraping failed" });
+  try {
+    // Scrape and AI-enhance content (summary, tags, sentiment, neutrality)
+    const result = await scrapeWebsite(url);
+    if (!result) return res.status(500).json({ error: "Scraping failed" });
 
-  // Save scraped content
-  const content = new ScrapedContent(result);
-  await content.save();
+    // Save scraped and AI enriched content
+    const content = new ScrapedContent(result);
+    await content.save();
 
-  // Use dummy userId if req.user is missing
-  const userId = req.user?.uid || "testUser123";
+    // Use authenticated user's ID or fallback
+    const userId = req.user?.uid || "testUser123";
 
-  // Record search history
-  await SearchHistory.create({
-    userId: userId, // From Firebase auth middleware
-    query: url,
-    results: [content._id],  // Storing reference to scraped content (MongoDB ObjectId)
-    timestamp: new Date()
-  });
+    // Record search history linked to the content and user
+    await SearchHistory.create({
+      userId,
+      query: url,
+      results: [content._id], // MongoDB ObjectId referencing scraped content
+      timestamp: new Date(),
+    });
 
-  res.json(content);
+    res.json(content);
+  } catch (error) {
+    console.error("scrapeAndSave error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
 };
-
-
-//works exactly like .NET controllers
-
-//TODO: add error handeling and validation
-//TODO: add logging
-//TODO: tests
