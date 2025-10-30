@@ -5,6 +5,8 @@ const {
   getNeutralityAndSentiment,
   getTagsFromAI,
   getGenSummary,
+  getDeepDiveSummaries,
+  getSmartResponseWithSources,
 } = require("./aiServices");
 
 const scrapeWebsite = async (url) => {
@@ -35,8 +37,13 @@ const scrapeWebsite = async (url) => {
 
     const { neutralityScore, sentimentScore } = sentimentResult;
 
+    // AI generated outline/insight, for richer result
+    const aiOutline = await getDeepDiveSummaries(bodyText); // or another function if you prefer
+
     const textSummary = await getGenSummary(bodyText);
     console.log("Summary from AI:", textSummary);
+
+    //refactor this to also give a smart AI generated outline/insight on the article for better user understanding
 
     return {
       url,
@@ -45,11 +52,32 @@ const scrapeWebsite = async (url) => {
       tags: tags,
       neutralityScore: neutralityScore,
       sentimentScore: sentimentScore,
+      aiOutline,
     };
   } catch (error) {
     console.error("Scraping failed:", error.message);
     return null;
   }
 };
+const deeperScrapeWebsite = async (url) => {
+  try {
+    // Extract and summarize main article
+    const mainResult = await scrapeWebsite(url);
 
-module.exports = scrapeWebsite;
+    // Using Gemini to get related sources, summaries, and all metadata
+    const relatedResult = await getSmartResponseWithSources(mainResult.text);
+
+    return {
+      main: mainResult,
+      aiSummary: relatedResult.summary,
+      neutralityScore: relatedResult.neutralityScore,
+      persuasionScore: relatedResult.persuasionScore,
+      relatedSources: relatedResult.sources, // Array of up to 6, each with url, title, summary, tags, scores
+    };
+  } catch (error) {
+    console.error("Deeper scraping failed:", error.message);
+    return null;
+  }
+};
+
+module.exports = { scrapeWebsite, deeperScrapeWebsite };
