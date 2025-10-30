@@ -1,5 +1,5 @@
 const ScrapedContent = require("../models/ScrapedContent");
-const scrapeWebsite = require("../services/scrapper");
+const { scrapeWebsite, deeperScrapeWebsite } = require("../services/scrapper");
 const SearchHistory = require("../models/SearchHistory");
 
 exports.scrapeAndSave = async (req, res) => {
@@ -29,6 +29,23 @@ exports.scrapeAndSave = async (req, res) => {
     res.json(content);
   } catch (error) {
     console.error("scrapeAndSave error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+exports.deeperScrape = async (req, res) => {
+  const { url } = req.body;
+  if (!url) return res.status(400).json({ error: "URL required" });
+
+  try {
+    // Perform deeper scraping
+    const result = await deeperScrapeWebsite(url);
+    if (!result)
+      return res.status(500).json({ error: "Deeper scraping failed" });
+
+    res.json(result);
+  } catch (error) {
+    console.error("deeperScrape error:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 };

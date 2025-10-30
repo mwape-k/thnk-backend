@@ -57,7 +57,7 @@ ${text}
 
   return await callAI(
     {
-      model: "gemini-2.5-flash",
+      model: "gemini-2.5-flash-lite",
       contents: [
         { type: "text", text: prompt },
         { type: "text", text: text },
@@ -92,7 +92,7 @@ ${text}
 
   return await callAI(
     {
-      model: "gemini-2.5-flash",
+      model: "gemini-2.5-flash-lite",
       contents: [
         { type: "text", text: prompt },
         { type: "text", text: text },
@@ -123,7 +123,7 @@ ${text}
 
   return await callAI(
     {
-      model: "gemini-2.5-flash",
+      model: "gemini-2.5-flash-lite",
       contents: [
         { type: "text", text: prompt },
         { type: "text", text: text },
@@ -156,11 +156,15 @@ async function getDeepDiveSummaries(prompt) {
   };
 
   const promptText = `
-You are a research assistant. Based on this prompt, provide up to 6 detailed summaries.
-Each summary should include:
-- summary text
-- neutralityScore (between 0 and 1)
-- list of source URLs
+You are a highly skilled research assistant working to provide in-depth, accurate, and unbiased research summaries.
+Based on the prompt below, please provide up to 6 detailed and unique summaries related to the topic. 
+For each summary, include the following:
+- A clear and concise summary text explaining the key points.
+- A neutralityScore, a number between 0 (very biased) and 1 (completely neutral).
+- A list of credible source URLs used to create the summary.
+- For each source, provide a brief explanation (1-2 sentences) of why it is credible or relevant.
+
+Important: Only return a JSON array where each item contains the keys: summary, neutralityScore, and sources. Do NOT include any additional commentary or text outside the JSON structure.
 
 Prompt:
 ${prompt}
@@ -168,7 +172,7 @@ ${prompt}
 
   return await callAI(
     {
-      model: "gemini-2.5-flash",
+      model: "gemini-2.5-flash-lite",
       contents: [{ type: "text", text: promptText }],
       config: {
         responseMimeType: "application/json",
@@ -232,7 +236,7 @@ ${prompt}`;
 
   const response = await callAI(
     {
-      model: "gemini-2.5-flash",
+      model: "gemini-2.5-flash-lite",
       contents: [{ type: "text", text: promptText }],
       config: {
         responseMimeType: "application/json",
@@ -246,6 +250,8 @@ ${prompt}`;
 
   return response;
 }
+
+//add funtions to assist with deeper scraping and analysis here
 
 module.exports = {
   getNeutralityAndSentiment,

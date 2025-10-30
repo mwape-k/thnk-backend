@@ -1,7 +1,10 @@
 const express = require("express");
 const router = express.Router();
 //const authenticateToken = require('../middleware/authMiddleware');
-const { scrapeAndSave } = require("../controllers/scrapeController");
+const {
+  scrapeAndSave,
+  deeperScrape,
+} = require("../controllers/scrapeController");
 
 /**
  * @swagger
@@ -23,8 +26,27 @@ const { scrapeAndSave } = require("../controllers/scrapeController");
  *         description: Successful scrape
  *       400:
  *         description: Bad request, URL missing
+ * /deeper-scrape:
+ *   post:
+ *     summary: Perform a deeper scrape of a given URL
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               url:
+ *                 type: string
+ *                 description: URL for deeper scraping
+ *     responses:
+ *       200:
+ *         description: Successful deeper scrape
+ *       400:
+ *         description: Bad request, URL missing
  */
 
-router.post('/scrape', scrapeAndSave);
+router.post("/scrape", scrapeAndSave);
+router.post("/deeper-scrape", deeperScrape);
 
 module.exports = router;
