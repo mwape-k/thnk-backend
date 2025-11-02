@@ -1,82 +1,117 @@
-// services/scrapper.js
 const axios = require("axios");
 const cheerio = require("cheerio");
 const {
-  getNeutralityAndSentiment,
-  getTagsFromAI,
-  getGenSummary,
-  getDeepDiveSummaries,
+  getComprehensiveAnalysis,
   getSmartResponseWithSources,
 } = require("./aiServices");
 
+// Helper function to extract clean text
+function extractCleanText($) {
+  // Remove script, style, nav, header, footer elements
+  $("script, style, nav, header, footer, .nav, .header, .footer").remove();
+
+  // Get text from content-rich elements
+  const selectors = [
+    "article p",
+    "main p",
+    ".content p",
+    ".article p",
+    ".post p",
+    "p",
+  ];
+
+  let bestText = "";
+
+  // Try structured selectors first
+  for (const selector of selectors) {
+    const paragraphs = $(selector)
+      .map((i, el) => $(el).text().trim())
+      .get()
+      .filter((text) => text.length > 50); // Filter out short paragraphs
+
+    if (paragraphs.length > 0) {
+      const combined = paragraphs.join("\n\n");
+      if (combined.length > bestText.length) {
+        bestText = combined;
+      }
+    }
+  }
+
+  return bestText || $("body").text().trim();
+}
+
 const scrapeWebsite = async (url) => {
   try {
-    const { data } = await axios.get(url);
+    console.time(`Scraping ${url}`);
+
+    const { data } = await axios.get(url, {
+      timeout: 10000,
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; ResearchBot/1.0)",
+      },
+    });
     const $ = cheerio.load(data);
 
     const title = $("title").text();
+    const bodyText = extractCleanText($);
 
-    // Extract paragraphs and join as main text content
-    const paragraphs = $("p")
-      .map((i, el) => $(el).text())
-      .get()
-      .join("\n\n");
-
-    // Use paragraphs as main body text
-    const bodyText = paragraphs.trim();
-
-    if (!bodyText) {
-      console.warn("No paragraph text found, extraction may be poor");
+    if (!bodyText || bodyText.length < 100) {
+      console.warn("Insufficient text content found for:", url);
+      return null;
     }
 
-    const tags = await getTagsFromAI(bodyText);
-    console.log("Tags from AI:", tags);
+    console.log(`Extracted ${bodyText.length} characters from ${url}`);
 
-    const sentimentResult = await getNeutralityAndSentiment(bodyText);
-    console.log("Sentiment from AI:", sentimentResult);
-
-    const { neutralityScore, sentimentScore } = sentimentResult;
-
-    // AI generated outline/insight, for richer result
-    const aiOutline = await getDeepDiveSummaries(bodyText); // or another function if you prefer
-
-    const textSummary = await getGenSummary(bodyText);
-    console.log("Summary from AI:", textSummary);
-
-    //refactor this to also give a smart AI generated outline/insight on the article for better user understanding
+    // SINGLE AI CALL for all analysis
+    console.time("AI Analysis");
+    const analysis = await getComprehensiveAnalysis(bodyText);
+    console.timeEnd("AI Analysis");
 
     return {
       url,
       title,
-      text: textSummary,
-      tags: tags,
-      neutralityScore: neutralityScore,
-      sentimentScore: sentimentScore,
-      aiOutline,
+      text: analysis.summary,
+      tags: analysis.tags,
+      neutralityScore: analysis.neutralityScore,
+      sentimentScore: analysis.sentimentScore,
+      aiOutline: analysis.deepDiveSummaries,
+      fullAnalysis: analysis, // Include full analysis if needed
     };
   } catch (error) {
-    console.error("Scraping failed:", error.message);
+    console.error("Scraping failed for", url, ":", error.message);
     return null;
+  } finally {
+    console.timeEnd(`Scraping ${url}`);
   }
 };
+
 const deeperScrapeWebsite = async (url) => {
   try {
-    // Extract and summarize main article
-    const mainResult = await scrapeWebsite(url);
+    console.time(`Deep scraping ${url}`);
 
-    // Using Gemini to get related sources, summaries, and all metadata
-    const relatedResult = await getSmartResponseWithSources(mainResult.text);
+    // Get main content first
+    const mainResult = await scrapeWebsite(url);
+    if (!mainResult) return null;
+
+    // Then get related sources in parallel (if needed)
+    const [relatedResult] = await Promise.all([
+      getSmartResponseWithSources(mainResult.text),
+      // Add other parallel calls here if needed
+    ]);
 
     return {
       main: mainResult,
-      aiSummary: relatedResult.summary,
-      neutralityScore: relatedResult.neutralityScore,
-      persuasionScore: relatedResult.persuasionScore,
-      relatedSources: relatedResult.sources, // Array of up to 6, each with url, title, summary, tags, scores
+      aiSummary: relatedResult?.summary || mainResult.text,
+      neutralityScore:
+        relatedResult?.neutralityScore || mainResult.neutralityScore,
+      persuasionScore: relatedResult?.persuasionScore || 0.5,
+      relatedSources: relatedResult?.sources || [],
     };
   } catch (error) {
     console.error("Deeper scraping failed:", error.message);
     return null;
+  } finally {
+    console.timeEnd(`Deep scraping ${url}`);
   }
 };
 
