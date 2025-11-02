@@ -1,30 +1,33 @@
 const ai = require("../config/gemini.js");
 const { Type } = require("@google/genai");
 
-// Enhanced utility with better error handling and logging
+// Utility to safely call AI with logging and error handling
 async function callAI(params, fallbackValue) {
   try {
-    const startTime = Date.now();
     const response = await ai.models.generateContent(params);
-    const endTime = Date.now();
-
-    console.log(`AI call completed in ${endTime - startTime}ms`);
-
-    // Simplified response checking
-    const text = response?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) {
+    if (
+      response &&
+      response.candidates &&
+      response.candidates[0] &&
+      response.candidates[0].content &&
+      Array.isArray(response.candidates[0].content.parts) &&
+      response.candidates[0].content.parts.length > 0 &&
+      response.candidates[0].content.parts[0].text
+    ) {
+      const text = response.candidates[0].content.parts[0].text;
+      try {
+        const parsed = JSON.parse(text);
+        return parsed;
+      } catch (e) {
+        console.error("JSON parse error:", e.message);
+        console.error("Text:", text);
+        return fallbackValue;
+      }
+    } else {
       console.error(
-        "Missing response text:",
+        "Missing or malformed response content parts:",
         JSON.stringify(response, null, 2)
       );
-      return fallbackValue;
-    }
-
-    try {
-      return JSON.parse(text);
-    } catch (e) {
-      console.error("JSON parse error:", e.message);
-      console.error("Raw text:", text);
       return fallbackValue;
     }
   } catch (error) {
@@ -33,71 +36,161 @@ async function callAI(params, fallbackValue) {
   }
 }
 
-// Single call to get ALL analysis in one go
-async function getComprehensiveAnalysis(text) {
+// Call Gemini to get neutrality and sentiment scores as structured response
+async function getNeutralityAndSentiment(text) {
   const responseSchema = {
     type: Type.OBJECT,
     properties: {
       neutralityScore: { type: Type.NUMBER },
       sentimentScore: { type: Type.NUMBER },
-      tags: {
-        type: Type.ARRAY,
-        items: { type: Type.STRING },
-      },
-      summary: { type: Type.STRING },
-      deepDiveSummaries: {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            summary: { type: Type.STRING },
-            neutralityScore: { type: Type.NUMBER },
-            sources: {
-              type: Type.ARRAY,
-              items: { type: Type.STRING },
-            },
-          },
-        },
-      },
     },
   };
 
   const prompt = `
-Analyze the following text comprehensively and provide a single JSON response with:
-
-1. neutralityScore: number between 0 (very biased) and 1 (completely neutral)
-2. sentimentScore: number between 0 (very negative) and 1 (very positive)
-3. tags: array of relevant keywords/tags
-4. summary: concise summary of the content
-5. deepDiveSummaries: array of up to 3 detailed summaries with neutrality scores and potential sources
+Analyze the following text and provide a JSON object with:
+- neutralityScore: a number between 0 (very biased) and 1 (completely neutral)
+- sentimentScore: a number between 0 (very negative) and 1 (very positive)
 
 Text:
-${text.substring(0, 10000)}  // Limit text length to prevent token limits
+${text}
 `;
 
   return await callAI(
     {
       model: "gemini-2.5-flash-lite",
-      contents: [{ type: "text", text: prompt }],
+      contents: [
+        { type: "text", text: prompt },
+        { type: "text", text: text },
+      ],
       config: {
         responseMimeType: "application/json",
         responseSchema,
-        thinkingConfig: { thinkingBudget: 1 }, // Small budget for better analysis
+        thinkingConfig: { thinkingBudget: 0 },
         systemInstruction:
-          "You are a comprehensive research analysis tool that provides multiple insights in a single response.",
+          "You are a research tool providing neutrality and sentiment analysis.",
       },
     },
-    {
-      neutralityScore: 0.5,
-      sentimentScore: 0.5,
-      tags: [],
-      summary: text.substring(0, 200) + "...",
-      deepDiveSummaries: [],
-    }
+    { neutralityScore: 0, sentimentScore: 0 }
   );
 }
 
-// Keep existing functions for individual use cases
+// Call Gemini to get tags in a structured JSON array
+async function getTagsFromAI(text) {
+  const responseSchema = {
+    type: Type.ARRAY,
+    items: {
+      type: Type.STRING,
+    },
+  };
+
+  const prompt = `
+Generate a concise list of relevant tags for the following content.
+Return only an array of strings:
+
+${text}
+`;
+
+  return await callAI(
+    {
+      model: "gemini-2.5-flash-lite",
+      contents: [
+        { type: "text", text: prompt },
+        { type: "text", text: text },
+      ],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema,
+        thinkingConfig: { thinkingBudget: 0 },
+        systemInstruction:
+          "You are a research tool that helps tag content with relevant keywords.",
+      },
+    },
+    []
+  );
+}
+
+// Call Gemini to generate a brief summary of the text
+async function getGenSummary(text) {
+  const responseSchema = {
+    type: Type.STRING,
+  };
+
+  const prompt = `
+Generate a clear and concise summary for the following content:
+
+${text}
+`;
+
+  return await callAI(
+    {
+      model: "gemini-2.5-flash-lite",
+      contents: [
+        { type: "text", text: prompt },
+        { type: "text", text: text },
+      ],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema,
+        systemInstruction: "You are a summarization tool.",
+      },
+    },
+    text.slice(0, 200) + "..."
+  );
+}
+
+// Call Gemini to generate up to 6 deep dive summaries with neutrality and sources
+async function getDeepDiveSummaries(prompt) {
+  const responseSchema = {
+    type: Type.ARRAY,
+    items: {
+      type: Type.OBJECT,
+      properties: {
+        summary: { type: Type.STRING },
+        neutralityScore: { type: Type.NUMBER },
+        sources: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING },
+        },
+      },
+    },
+  };
+
+  const promptText = `
+You are a highly skilled research assistant working to provide in-depth, accurate, and unbiased research summaries.
+Based on the prompt below, please provide up to 6 detailed and unique summaries related to the topic. 
+For each summary, include the following:
+- A clear and concise summary text explaining the key points.
+- A neutralityScore, a number between 0 (very biased) and 1 (completely neutral).
+- A list of credible source URLs used to create the summary.
+- For each source, provide a brief explanation (1-2 sentences) of why it is credible or relevant.
+
+Important: Only return a JSON array where each item contains the keys: summary, neutralityScore, and sources. Do NOT include any additional commentary or text outside the JSON structure.
+
+Prompt:
+${prompt}
+`;
+
+  return await callAI(
+    {
+      model: "gemini-2.5-flash-lite",
+      contents: [{ type: "text", text: promptText }],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema,
+        systemInstruction:
+          "You are a research assistant providing detailed summaries with neutrality scores and sources.",
+      },
+    },
+    [
+      {
+        summary: "Sample summary 1",
+        neutralityScore: 0.5,
+        sources: ["https://sourcesite1.com", "https://sourcesite2.com"],
+      },
+    ]
+  );
+}
+
 async function getSmartResponseWithSources(prompt) {
   const responseSchema = {
     type: Type.OBJECT,
@@ -122,17 +215,26 @@ async function getSmartResponseWithSources(prompt) {
     },
   };
 
-  const promptText = `Provide a comprehensive research response for: ${prompt}
+  const promptText = `You are a research assistant with access to credible information. Given the prompt below, provide:
 
-Return JSON with:
-- summary: concise answer
-- neutralityScore: 0-1
-- persuasionScore: 0-1  
-- sources: up to 4 reputable sources with url, title, text, tags, neutralityScore, sentimentScore
+1. A concise summary answering the prompt.
+2. Neutrality and persuasion scores (0 to 1).
+3. An array "sources" of up to 6 reputable sources used, each with:
+  - url: full URL starting with http:// or https://
+  - title: source title
+  - text: brief summary or excerpt
+  - tags: array of relevant keywords
+  - neutralityScore: 0 to 1
+  - sentimentScore: 0 to 1
 
-Only return valid JSON.`;
+Return only a valid JSON object with keys: summary, neutralityScore, persuasionScore, sources.
 
-  return await callAI(
+No explanation or extra text outside JSON.
+
+Prompt:
+${prompt}`;
+
+  const response = await callAI(
     {
       model: "gemini-2.5-flash-lite",
       contents: [{ type: "text", text: promptText }],
@@ -140,25 +242,21 @@ Only return valid JSON.`;
         responseMimeType: "application/json",
         responseSchema,
         systemInstruction:
-          "Provide concise research summaries with detailed source information.",
+          "You assist users by providing concise summaries and detailed source info.",
       },
     },
     null
   );
+
+  return response;
 }
 
+//add funtions to assist with deeper scraping and analysis here
+
 module.exports = {
-  getComprehensiveAnalysis,
+  getNeutralityAndSentiment,
+  getTagsFromAI,
+  getGenSummary,
+  getDeepDiveSummaries,
   getSmartResponseWithSources,
-  // Keep individual functions for backward compatibility
-  getNeutralityAndSentiment: (text) =>
-    getComprehensiveAnalysis(text).then((r) => ({
-      neutralityScore: r.neutralityScore,
-      sentimentScore: r.sentimentScore,
-    })),
-  getTagsFromAI: (text) => getComprehensiveAnalysis(text).then((r) => r.tags),
-  getGenSummary: (text) =>
-    getComprehensiveAnalysis(text).then((r) => r.summary),
-  getDeepDiveSummaries: (text) =>
-    getComprehensiveAnalysis(text).then((r) => r.deepDiveSummaries),
 };
