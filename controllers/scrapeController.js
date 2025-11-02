@@ -41,7 +41,12 @@ exports.deeperScrape = async (req, res) => {
     // Perform deeper scraping
     const result = await deeperScrapeWebsite(url);
     if (!result)
-      return res.status(500).json({ error: "Deeper scraping failed" });
+      return res
+        .status(404)
+        .json({
+          error:
+            "Unable to scrape the provided URL. The site may be blocking requests or the URL may be invalid.",
+        });
 
     res.json(result);
   } catch (error) {

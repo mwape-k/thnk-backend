@@ -6,7 +6,7 @@ const {
   getSmartResponseWithSources,
 } = require("../services/aiServices");
 
-const scrapeWebsite = require("../services/scrapper");
+const { scrapeWebsite, deeperScrapeWebsite } = require("../services/scrapper");
 const ScrapedContent = require("../models/ScrapedContent");
 
 // Handler for neutrality & sentiment analysis
@@ -97,53 +97,36 @@ exports.processUserPrompt = async (req, res) => {
   if (!prompt) return res.status(400).json({ error: "Prompt is required" });
 
   try {
-    // Step 1: Get full AI smart response with summary, scores, and source info
+    // Step 1: Get full AI smart response
     const aiResponse = await getSmartResponseWithSources(prompt);
     if (!aiResponse) {
       return res.status(500).json({ error: "Failed to get AI response" });
     }
 
-    console.log("AI Response:", aiResponse);
-    const { summary, neutralityScore, persuasionScore, sources } = aiResponse;
+    const {
+      summary,
+      neutralityScore,
+      persuasionScore,
+      sources = [],
+    } = aiResponse;
 
-    // Step 2: Scrape and enrich each source URL in parallel
-    let enrichedSources = [];
-    if (Array.isArray(sources)) {
-      const scrapePromises = sources.map(async (source) => {
-        console.log("Scraping source URL:", source.url);
+    // Step 2: Just use the AI-generated source data directly
+    const processedSources = sources.map((source) => ({
+      url: source.url,
+      title: source.title,
+      text: source.text,
+      tags: source.tags,
+      neutralityScore: source.neutralityScore,
+      sentimentScore: source.sentimentScore,
+      aiGenerated: true, // Flag to indicate this is AI-generated data
+    }));
 
-        if (
-          !source.url.startsWith("http://") &&
-          !source.url.startsWith("https://")
-        ) {
-          console.warn("Invalid URL, skipping:", source.url);
-          return null;
-        }
-
-        const scraped = await scrapeWebsite(source.url);
-        if (!scraped) return null;
-
-        // Combine scores from AI and scraped data (prefer AI scores)
-        scraped.neutralityScore =
-          source.neutralityScore ?? scraped.neutralityScore;
-        scraped.sentimentScore =
-          source.sentimentScore ?? scraped.sentimentScore;
-
-        const savedContent = new ScrapedContent(scraped);
-        await savedContent.save();
-
-        return savedContent;
-      });
-
-      enrichedSources = (await Promise.all(scrapePromises)).filter(Boolean);
-    }
-
-    // Step 3: Return full smart response and enriched sources
+    // Step 3: Return response with AI-generated sources
     res.json({
       summary,
       neutralityScore,
       persuasionScore,
-      sources: enrichedSources,
+      sources: processedSources,
     });
   } catch (error) {
     console.error("Error in processUserPrompt:", error);
