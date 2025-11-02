@@ -6,10 +6,16 @@ async function callAI(params, fallbackValue) {
   try {
     const response = await ai.models.generateContent(params);
 
-    // Faster response checking using optional chaining
     const text = response?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!text) {
       console.error("Missing response text");
+      return fallbackValue;
+    }
+
+    // Check response size before parsing
+    if (text.length > 100000) {
+      // 100k character limit
+      console.error("Response too large, likely truncated:", text.length);
       return fallbackValue;
     }
 
@@ -17,6 +23,8 @@ async function callAI(params, fallbackValue) {
       return JSON.parse(text);
     } catch (e) {
       console.error("JSON parse error:", e.message);
+      console.error("First 500 chars:", text.substring(0, 500));
+      console.error("Last 500 chars:", text.substring(text.length - 500));
       return fallbackValue;
     }
   } catch (error) {
