@@ -1,5 +1,6 @@
 const ScrapedContent = require("../models/ScrapedContent");
 const { scrapeWebsite, deeperScrapeWebsite } = require("../services/scrapper");
+const { saveSearch } = require("../services/userHistory");
 const SearchHistory = require("../models/SearchHistory");
 
 exports.scrapeAndSave = async (req, res) => {
@@ -18,13 +19,8 @@ exports.scrapeAndSave = async (req, res) => {
     // Use authenticated user's ID or fallback
     const userId = req.user?.uid || "testUser123";
 
-    // Record search history linked to the content and user
-    await SearchHistory.create({
-      userId,
-      query: url,
-      results: [content._id], // MongoDB ObjectId referencing scraped content
-      timestamp: new Date(),
-    });
+    // Save to search history using the service
+    await saveSearch(userId, url, [content._id]);
 
     res.json(content);
   } catch (error) {
@@ -41,12 +37,14 @@ exports.deeperScrape = async (req, res) => {
     // Perform deeper scraping
     const result = await deeperScrapeWebsite(url);
     if (!result)
-      return res
-        .status(404)
-        .json({
-          error:
-            "Unable to scrape the provided URL. The site may be blocking requests or the URL may be invalid.",
-        });
+      return res.status(404).json({
+        error:
+          "Unable to scrape the provided URL. The site may be blocking requests or the URL may be invalid.",
+      });
+
+    // Save to search history with the deeperScrape result
+    const userId = req.user?.uid || "testUser123";
+    await saveSearchHistory(userId, url, result);
 
     res.json(result);
   } catch (error) {

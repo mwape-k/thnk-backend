@@ -10,6 +10,7 @@ const scrapeRoutes = require("./routes/scrapeRoutes");
 console.log("scrapes importd: ", scrapeRoutes);
 const thnkRoutes = require("./routes/thnkRoutes");
 console.log("thnk importd: ", thnkRoutes);
+const historyRoutes = require("./routes/historyRoutes");
 
 console.log("loading env");
 
@@ -26,7 +27,11 @@ const app = express();
 //enable CORS for all routes
 app.use(
   cors({
-    origin: ["http://localhost:5173", "http://127.0.0.1:5173"], // Your frontend URL
+    origin: [
+      "http://localhost:5173",
+      "http://127.0.0.1:5173",
+      "http://0.0.0.0",
+    ], // Your frontend URL
     credentials: true, // If you're using cookies/sessions
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "Accept"],
@@ -38,6 +43,7 @@ app.use(express.json());
 //Routes
 app.use("/api", scrapeRoutes);
 app.use("/api", thnkRoutes);
+app.use("/api/history", historyRoutes);
 
 // Setup Swagger docs route
 setupSwagger(app);
