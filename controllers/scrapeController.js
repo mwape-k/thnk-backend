@@ -1,6 +1,6 @@
 const ScrapedContent = require("../models/ScrapedContent");
 const { scrapeWebsite, deeperScrapeWebsite } = require("../services/scrapper");
-const { saveSearch } = require("../services/userHistory");
+const { saveSearchHistory } = require("../services/userHistory");
 const SearchHistory = require("../models/SearchHistory");
 
 exports.scrapeAndSave = async (req, res) => {
@@ -20,7 +20,7 @@ exports.scrapeAndSave = async (req, res) => {
     const userId = req.user?.uid || "testUser123";
 
     // Save to search history using the service
-    await saveSearch(userId, url, [content._id]);
+    await saveSearchHistory(userId, url, [content._id]);
 
     res.json(content);
   } catch (error) {
