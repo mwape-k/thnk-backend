@@ -1,4 +1,5 @@
 const express = require("express");
+const cors = require("cors");
 const setupSwagger = require("./swagger");
 
 const connectDB = require("./config/db");
@@ -21,6 +22,17 @@ connectDB();
 console.log("DB connected, starting server");
 
 const app = express();
+
+//enable CORS for all routes
+app.use(
+  cors({
+    origin: ["http://localhost:5173", "http://127.0.0.1:5173"], // Your frontend URL
+    credentials: true, // If you're using cookies/sessions
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "Accept"],
+  })
+);
+
 app.use(express.json());
 
 //Routes
