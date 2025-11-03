@@ -78,13 +78,11 @@ exports.queryHandle = async (req, res) => {
       summary
     );
 
-    // Optionally Step 4: Deep dive summaries if client requests later
-
     res.json({
       summary,
       tags,
       neutralityScore,
-      sentimentScore,
+      sentimentScore, // Consistent with getNeutralityAndSentiment return
     });
   } catch (error) {
     console.error("Query handle error:", error.message);
@@ -92,6 +90,7 @@ exports.queryHandle = async (req, res) => {
   }
 };
 
+//main controller for prompt handling
 exports.processUserPrompt = async (req, res) => {
   const { prompt } = req.body;
   if (!prompt) return res.status(400).json({ error: "Prompt is required" });
@@ -106,27 +105,27 @@ exports.processUserPrompt = async (req, res) => {
     const {
       summary,
       neutralityScore,
-      persuasionScore,
+      persuasionScore, // This should come from getSmartResponseWithSources
       sources = [],
     } = aiResponse;
 
-    // Step 2: Just use the AI-generated source data directly
+    // Step 2: Process sources - CORRECTED: Use sentimentScore for sources
     const processedSources = sources.map((source) => ({
       url: source.url,
       title: source.title,
       text: source.text,
       tags: source.tags,
       neutralityScore: source.neutralityScore,
-      sentimentScore: source.sentimentScore,
-      aiGenerated: true, // Flag to indicate this is AI-generated data
+      sentimentScore: source.sentimentScore, // Individual sources have sentiment, not persuasion
+      aiGenerated: true,
     }));
 
-    // Step 3: Return response with AI-generated sources
+    // Step 3: Return response with consistent scoring
     res.json({
       summary,
       neutralityScore,
-      persuasionScore,
-      sources: processedSources,
+      persuasionScore, // Main response uses persuasionScore
+      sources: processedSources, // Sources use sentimentScore
     });
   } catch (error) {
     console.error("Error in processUserPrompt:", error);
