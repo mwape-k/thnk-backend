@@ -97,21 +97,14 @@ exports.processUserPrompt = async (req, res) => {
   if (!prompt) return res.status(400).json({ error: "Prompt is required" });
 
   try {
-    // Step 1: Get full AI smart response
-    const aiResponse = await getSmartResponseWithSources(prompt);
-    if (!aiResponse) {
+    // Step 1: using enhanced smart response instead of basic one
+    const enhancedResponse = await getEnhancedSmartResponseWithSources(prompt);
+    if (!enhancedResponse) {
       return res.status(500).json({ error: "Failed to get AI response" });
     }
 
-    const {
-      summary,
-      neutralityScore,
-      persuasionScore,
-      sources = [],
-    } = aiResponse;
-
-    // Step 2: Process sources
-    const processedSources = sources.map((source) => ({
+    //step 2: Process and return the enhanced response
+    const processedSources = enhancedResponse.sources.map((source) => ({
       url: source.url,
       title: source.title,
       text: source.text,
@@ -123,10 +116,17 @@ exports.processUserPrompt = async (req, res) => {
 
     // Step 3: Create response data
     const responseData = {
-      summary,
-      neutralityScore,
-      persuasionScore,
+      // Core response
+      summary: enhancedResponse.summary,
+      neutralityScore: enhancedResponse.neutralityScore,
+      persuasionScore: enhancedResponse.persuasionScore,
       sources: processedSources,
+
+      // Enhanced educational content
+      biasAnalysis: enhancedResponse.biasAnalysis,
+      sourceMetrics: enhancedResponse.sourceMetrics,
+      researchQuality: enhancedResponse.researchQuality,
+      quickAssessment: enhancedResponse.quickAssessment,
     };
 
     // Step 4: Save to search history BEFORE sending response
