@@ -2,7 +2,6 @@ const {
   getNeutralityAndSentiment,
   getTagsFromAI,
   getGenSummary,
-  getDeepDiveSummaries,
   getSmartResponseWithSources,
   getEnhancedSmartResponseWithSources,
 } = require("../services/aiServices");
