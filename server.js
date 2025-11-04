@@ -50,6 +50,17 @@ app.use(
 
 app.use(express.json());
 
+// Detailed route debugging
+app.use((req, res, next) => {
+  console.log("=== ROUTE DEBUGGING ===");
+  console.log("Method:", req.method);
+  console.log("Original URL:", req.originalUrl);
+  console.log("Path:", req.path);
+  console.log("Base URL:", req.baseUrl);
+  console.log("==================");
+  next();
+});
+
 // Routes
 app.use("/api", scrapeRoutes);
 app.use("/api", thnkRoutes);
