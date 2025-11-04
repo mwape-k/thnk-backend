@@ -25,14 +25,14 @@ const app = express();
 app.use(
   cors({
     origin: function (origin, callback) {
-      // Allow requests with no origin (like mobile apps or curl requests)
+      // Allow requests with no origin (like mobile apps)
       if (!origin) return callback(null, true);
 
       const allowedOrigins = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
-        "http://localhost:3000",
-        // Add frontend URL
+        "https://thnk-frontend.vercel.app",
+        "https://thnk-frontend.vercel.app/",
       ];
 
       if (allowedOrigins.indexOf(origin) !== -1) {
@@ -43,8 +43,6 @@ app.use(
       }
     },
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "Accept"],
   })
 );
 
