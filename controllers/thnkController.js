@@ -4,6 +4,7 @@ const {
   getGenSummary,
   getDeepDiveSummaries,
   getSmartResponseWithSources,
+  getEnhancedSmartResponseWithSources,
 } = require("../services/aiServices");
 
 const { scrapeWebsite, deeperScrapeWebsite } = require("../services/scrapper");

@@ -126,7 +126,7 @@ async function getDeepDiveSummaries(prompt) {
     },
   };
 
-  const promptText = `Provide 3-6 research summaries for: ${prompt}. Each with summary, neutralityScore (0-1), and source URLs. Return only JSON array.`;
+  const promptText = `Provide 3-6 research summaries for: ${prompt}. Each with summary, neutralityScore (0-1), and source URLs from credible domains only. Return only JSON array.`;
 
   return await callAI(
     {
@@ -135,7 +135,8 @@ async function getDeepDiveSummaries(prompt) {
       config: {
         responseMimeType: "application/json",
         responseSchema,
-        systemInstruction: "Return only JSON array of research summaries.",
+        systemInstruction:
+          "Return only JSON array of research summaries with valid URLs from reputable sources.",
       },
     },
     [
@@ -148,7 +149,7 @@ async function getDeepDiveSummaries(prompt) {
   );
 }
 
-// Optimized: More concise prompt
+// Enhanced: Strict URL validation and credibility requirements
 async function getSmartResponseWithSources(prompt) {
   const responseSchema = {
     type: Type.OBJECT,
@@ -173,7 +174,26 @@ async function getSmartResponseWithSources(prompt) {
     },
   };
 
-  const promptText = `Research: ${prompt}. Provide JSON with summary, scores, and 4-6 credible sources with valid URLs, titles, text, tags, and scores.`;
+  const promptText = `
+Research the topic: "${prompt}"
+
+CRITICAL REQUIREMENTS FOR SOURCES:
+1. URLs MUST be real, accessible websites that exist (no 404 errors)
+2. Prioritize credible domains: .edu, .gov, .org, established news outlets, academic journals
+3. AVOID: Wikipedia, personal blogs, social media, forums, questionable domains
+4. Each URL must be a complete, valid web address starting with https://
+5. Sources must be relevant and authoritative for the topic
+6. Ensure URLs are not made up or hallucinated
+
+Provide 4-6 high-quality sources with:
+- Valid, working URLs from reputable domains
+- Accurate titles that match the actual content
+- Concise, relevant text excerpts
+- Appropriate tags
+- Neutrality and sentiment scores
+
+Return only valid JSON with research response and verified sources.
+`;
 
   return await callAI(
     {
@@ -182,15 +202,23 @@ async function getSmartResponseWithSources(prompt) {
       config: {
         responseMimeType: "application/json",
         responseSchema,
-        systemInstruction:
-          "Return only valid JSON with research response and sources.",
+        systemInstruction: `You are a research assistant that provides ONLY real, verifiable sources. 
+        
+STRICT RULES:
+- NEVER invent or hallucinate URLs
+- ONLY use domains that are known to exist and be credible
+- ALWAYS verify URLs would be accessible to users
+- REJECT any questionable or low-quality sources
+- PRIORITIZE: .edu, .gov, .org, academic, and established media sources
+- AVOID: Wikipedia, personal blogs, social media, forums
+
+Return valid JSON with real, working sources only.`,
       },
     },
     null
   );
 }
 
-//Below is an async function for source insight -> goal to give the THNK platform more use beyond summaries
 // Enhanced bias analysis with educational insights
 async function getBiasAnalysisInsights(aiResponse) {
   const responseSchema = {
@@ -235,6 +263,7 @@ ${aiResponse.sources
 Source ${index + 1}:
 - Title: ${source.title}
 - URL: ${source.url}
+- Domain: ${source.url ? new URL(source.url).hostname : "N/A"}
 - Neutrality: ${source.neutralityScore}
 - Sentiment: ${source.sentimentScore}
 - Tags: ${source.tags.join(", ")}
@@ -287,23 +316,29 @@ Focus on educational value and helping users develop media literacy skills.
   );
 }
 
-// Enhanced version of getSmartResponseWithSources that includes bias insights
+// Enhanced version with URL validation
 async function getEnhancedSmartResponseWithSources(prompt) {
   try {
     // Get the original AI response
     const aiResponse = await getSmartResponseWithSources(prompt);
     if (!aiResponse) return null;
 
+    // Validate URLs in the response
+    const validatedResponse = await validateAndEnhanceSources(aiResponse);
+
     // Get comprehensive bias analysis
-    const biasInsights = await getBiasAnalysisInsights(aiResponse);
+    const biasInsights = await getBiasAnalysisInsights(validatedResponse);
 
     // Calculate additional metrics
-    const sourceMetrics = calculateSourceMetrics(aiResponse.sources);
-    const researchQuality = assessResearchQuality(aiResponse, sourceMetrics);
+    const sourceMetrics = calculateSourceMetrics(validatedResponse.sources);
+    const researchQuality = assessResearchQuality(
+      validatedResponse,
+      sourceMetrics
+    );
 
     return {
-      // Original response
-      ...aiResponse,
+      // Validated response
+      ...validatedResponse,
 
       // Enhanced educational components
       biasAnalysis: biasInsights,
@@ -312,7 +347,7 @@ async function getEnhancedSmartResponseWithSources(prompt) {
 
       // Quick assessment for UI display
       quickAssessment: generateQuickAssessment(
-        aiResponse,
+        validatedResponse,
         sourceMetrics,
         researchQuality
       ),
@@ -321,6 +356,75 @@ async function getEnhancedSmartResponseWithSources(prompt) {
     console.error("Error in enhanced smart response:", error);
     return await getSmartResponseWithSources(prompt); // Fallback to original
   }
+}
+
+// New function to validate and enhance sources
+async function validateAndEnhanceSources(aiResponse) {
+  if (!aiResponse.sources) return aiResponse;
+
+  const validatedSources = aiResponse.sources.map((source) => {
+    // Basic URL validation
+    let urlValid = false;
+    let domainType = "unknown";
+
+    try {
+      const url = new URL(source.url);
+      urlValid = true;
+
+      // Categorize domain for credibility assessment
+      const hostname = url.hostname.toLowerCase();
+      if (hostname.includes(".edu")) domainType = "academic";
+      else if (hostname.includes(".gov")) domainType = "government";
+      else if (hostname.includes(".org")) domainType = "organization";
+      else if (
+        hostname.includes(".com") &&
+        (hostname.includes("reuters") ||
+          hostname.includes("apnews") ||
+          hostname.includes("bbc") ||
+          hostname.includes("nytimes") ||
+          hostname.includes("theguardian"))
+      )
+        domainType = "established_media";
+      else domainType = "general";
+    } catch (error) {
+      console.warn(`Invalid URL format: ${source.url}`);
+      urlValid = false;
+    }
+
+    return {
+      ...source,
+      urlValid,
+      domainType,
+      credibilityScore: calculateCredibilityScore(source.url, domainType),
+    };
+  });
+
+  return {
+    ...aiResponse,
+    sources: validatedSources,
+  };
+}
+
+// Helper function to calculate source credibility
+function calculateCredibilityScore(url, domainType) {
+  let score = 0.5; // Base score
+
+  // Domain type scoring
+  const domainScores = {
+    academic: 0.9,
+    government: 0.8,
+    established_media: 0.7,
+    organization: 0.6,
+    general: 0.4,
+  };
+
+  score = domainScores[domainType] || 0.5;
+
+  // Additional factors
+  if (url.includes("blog.") || url.includes("medium.com")) score -= 0.2;
+  if (url.includes("wikipedia.org")) score = 0.6; // Wikipedia is generally reliable but not primary
+
+  return Math.max(0.1, Math.min(1, score));
 }
 
 // Helper function to calculate source metrics
@@ -353,45 +457,79 @@ function calculateSourceMetrics(sources) {
     diversityScore: calculateDiversityScore(sources),
     scoreVariance: calculateScoreVariance(neutralityScores),
     balancedPerspectives: checkPerspectiveBalance(neutralityScores),
+    credibilityStats: calculateCredibilityStats(sources),
   };
 }
 
-// Helper function to assess research quality
+// New function to calculate credibility statistics
+function calculateCredibilityStats(sources) {
+  const credibilityScores = sources.map((s) => s.credibilityScore || 0.5);
+  const domainTypes = sources.map((s) => s.domainType || "unknown");
+
+  return {
+    averageCredibility:
+      credibilityScores.reduce((a, b) => a + b, 0) / credibilityScores.length,
+    highCredibilityCount: credibilityScores.filter((s) => s > 0.7).length,
+    domainDistribution: domainTypes.reduce((acc, type) => {
+      acc[type] = (acc[type] || 0) + 1;
+      return acc;
+    }, {}),
+  };
+}
+
+// Enhanced research quality assessment
 function assessResearchQuality(aiResponse, sourceMetrics) {
   const { neutralityScore, persuasionScore, sources } = aiResponse;
-  const { neutralityRange, diversityScore, scoreVariance } = sourceMetrics;
+  const { neutralityRange, diversityScore, scoreVariance, credibilityStats } =
+    sourceMetrics;
 
   let qualityScore = 0;
   const factors = [];
 
   // Factor 1: Overall neutrality
   if (neutralityScore > 0.7) {
-    qualityScore += 0.3;
+    qualityScore += 0.2;
     factors.push("High overall neutrality");
   } else if (neutralityScore > 0.5) {
-    qualityScore += 0.2;
+    qualityScore += 0.1;
     factors.push("Moderate overall neutrality");
   }
 
   // Factor 2: Source diversity
   if (diversityScore > 0.7) {
-    qualityScore += 0.3;
+    qualityScore += 0.2;
     factors.push("Good source diversity");
   } else if (diversityScore > 0.4) {
-    qualityScore += 0.2;
+    qualityScore += 0.1;
     factors.push("Moderate source diversity");
   }
 
   // Factor 3: Perspective range
   if (neutralityRange.max - neutralityRange.min > 0.3) {
-    qualityScore += 0.2;
+    qualityScore += 0.15;
     factors.push("Wide perspective range");
   }
 
   // Factor 4: Source count
   if (sources.length >= 4) {
-    qualityScore += 0.2;
+    qualityScore += 0.15;
     factors.push("Adequate source quantity");
+  }
+
+  // Factor 5: Source credibility (NEW)
+  if (credibilityStats.averageCredibility > 0.7) {
+    qualityScore += 0.2;
+    factors.push("High source credibility");
+  } else if (credibilityStats.averageCredibility > 0.5) {
+    qualityScore += 0.1;
+    factors.push("Moderate source credibility");
+  }
+
+  // Factor 6: Valid URLs (NEW)
+  const validUrlCount = sources.filter((s) => s.urlValid !== false).length;
+  if (validUrlCount === sources.length) {
+    qualityScore += 0.1;
+    factors.push("All URLs appear valid");
   }
 
   return {
@@ -404,7 +542,8 @@ function assessResearchQuality(aiResponse, sourceMetrics) {
 // Helper function to generate quick assessment for UI
 function generateQuickAssessment(aiResponse, sourceMetrics, researchQuality) {
   const { neutralityScore, persuasionScore } = aiResponse;
-  const { neutralityRange, balancedPerspectives } = sourceMetrics;
+  const { neutralityRange, balancedPerspectives, credibilityStats } =
+    sourceMetrics;
 
   const assessment = {
     overallNeutrality:
@@ -415,6 +554,12 @@ function generateQuickAssessment(aiResponse, sourceMetrics, researchQuality) {
         : "low",
     perspectiveBalance: balancedPerspectives ? "balanced" : "skewed",
     researchQuality: researchQuality.rating,
+    sourceCredibility:
+      credibilityStats.averageCredibility > 0.7
+        ? "high"
+        : credibilityStats.averageCredibility > 0.5
+        ? "moderate"
+        : "low",
     keyConsideration: "",
   };
 
@@ -428,6 +573,9 @@ function generateQuickAssessment(aiResponse, sourceMetrics, researchQuality) {
   } else if (neutralityScore < 0.4) {
     assessment.keyConsideration =
       "Low overall neutrality - verify claims with additional sources";
+  } else if (credibilityStats.averageCredibility < 0.5) {
+    assessment.keyConsideration =
+      "Source credibility is low - consider more authoritative references";
   } else {
     assessment.keyConsideration =
       "Moderate balance achieved - continue critical evaluation";
@@ -481,4 +629,5 @@ module.exports = {
   getSmartResponseWithSources,
   getEnhancedSmartResponseWithSources,
   getBiasAnalysisInsights,
+  validateAndEnhanceSources,
 };

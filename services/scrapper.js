@@ -7,6 +7,7 @@ const {
   getGenSummary,
   getDeepDiveSummaries,
   getSmartResponseWithSources,
+  getEnhancedSmartResponseWithSources,
 } = require("./aiServices");
 
 const scrapeWebsite = async (url) => {
@@ -92,7 +93,9 @@ const deeperScrapeWebsite = async (url) => {
     }
 
     // Using Gemini to get related sources, summaries, and all metadata
-    const relatedResult = await getSmartResponseWithSources(mainResult.text);
+    const relatedResult = await getEnhancedSmartResponseWithSources(
+      mainResult.text
+    );
 
     return {
       main: mainResult,
