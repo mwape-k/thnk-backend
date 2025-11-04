@@ -8,6 +8,7 @@ const {
 
 const { scrapeWebsite, deeperScrapeWebsite } = require("../services/scrapper");
 const ScrapedContent = require("../models/ScrapedContent");
+const { saveSearchHistory } = require("../services/userHistory");
 
 // Handler for neutrality & sentiment analysis
 exports.analyzeSentiment = async (req, res) => {
@@ -105,28 +106,41 @@ exports.processUserPrompt = async (req, res) => {
     const {
       summary,
       neutralityScore,
-      persuasionScore, // This should come from getSmartResponseWithSources
+      persuasionScore,
       sources = [],
     } = aiResponse;
 
-    // Step 2: Process sources - CORRECTED: Use sentimentScore for sources
+    // Step 2: Process sources
     const processedSources = sources.map((source) => ({
       url: source.url,
       title: source.title,
       text: source.text,
       tags: source.tags,
       neutralityScore: source.neutralityScore,
-      sentimentScore: source.sentimentScore, // Individual sources have sentiment, not persuasion
+      sentimentScore: source.sentimentScore,
       aiGenerated: true,
     }));
 
-    // Step 3: Return response with consistent scoring
-    res.json({
+    // Step 3: Create response data
+    const responseData = {
       summary,
       neutralityScore,
-      persuasionScore, // Main response uses persuasionScore
-      sources: processedSources, // Sources use sentimentScore
-    });
+      persuasionScore,
+      sources: processedSources,
+    };
+
+    // Step 4: Save to search history BEFORE sending response
+    const userId = req.user?.uid || "testUser123";
+
+    // Make sure saveSearchHistory is called with correct parameters
+    await saveSearchHistory(
+      userId,
+      prompt, // The user's original prompt as query
+      responseData // The full AI response as result
+    );
+
+    // Step 5: Send response
+    res.json(responseData);
   } catch (error) {
     console.error("Error in processUserPrompt:", error);
     res.status(500).json({ error: "Failed to process user prompt" });

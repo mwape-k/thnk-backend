@@ -173,7 +173,7 @@ async function getSmartResponseWithSources(prompt) {
     },
   };
 
-  const promptText = `Research: ${prompt}. Provide JSON with summary, scores, and 4-6 sources with URLs, titles, text, tags, and scores.`;
+  const promptText = `Research: ${prompt}. Provide JSON with summary, scores, and 4-6 credible sources with valid URLs, titles, text, tags, and scores.`;
 
   return await callAI(
     {
