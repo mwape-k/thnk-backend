@@ -9,7 +9,7 @@ const {
   getEnhancedSmartResponseWithSources,
 } = require("./aiServices");
 
-const scrapeWebsite = async (url, retries = 3) => {
+const scrapeWebsite = async (url) => {
   try {
     const { data } = await axios.get(url, {
       timeout: 10000,
@@ -54,7 +54,7 @@ const scrapeWebsite = async (url, retries = 3) => {
     const { neutralityScore, sentimentScore } = sentimentResult;
 
     // AI generated outline/insight
-    //const aiOutline = await textSummary;
+    const aiOutline = await getDeepDiveSummaries(limitedBodyText);
 
     const textSummary = await getGenSummary(limitedBodyText);
     console.log("Summary from AI:", textSummary);
@@ -66,7 +66,7 @@ const scrapeWebsite = async (url, retries = 3) => {
       tags: tags,
       neutralityScore: neutralityScore,
       sentimentScore: sentimentScore,
-      //aiOutline,
+      aiOutline,
     };
   } catch (error) {
     if (error.response?.status === 403 && retries > 0) {
@@ -83,7 +83,7 @@ const scrapeWebsite = async (url, retries = 3) => {
 const deeperScrapeWebsite = async (url) => {
   try {
     // Extract and summarize main article
-    const mainResult = await scrapeWebsite(url, 3);
+    const mainResult = await scrapeWebsite(url);
 
     // Check if scraping was successful
     if (!mainResult) {
