@@ -92,24 +92,28 @@ async function getTagsFromAI(text) {
   );
 }
 
-// Optimized: Simplified prompt
+// Optimised: Simplified prompt
 async function getGenSummary(text) {
-  const responseSchema = { type: Type.STRING };
+  try {
+    const prompt = `Provide a concise summary of this text: ${text.substring(
+      0,
+      6000
+    )}`;
 
-  const prompt = `Summarize concisely: ${text.substring(0, 6000)}`;
-
-  return await callAI(
-    {
+    const response = await ai.models.generateContent({
       model: FLASH_LITE_MODEL,
       contents: [{ type: "text", text: prompt }],
       config: {
-        responseMimeType: "application/json",
-        responseSchema,
-        systemInstruction: "Provide a concise summary as a JSON string.",
+        systemInstruction: "Provide only the summary text, no JSON formatting.",
       },
-    },
-    text.slice(0, 200) + "..."
-  );
+    });
+
+    const summary = response?.candidates?.[0]?.content?.parts?.[0]?.text;
+    return summary || text.slice(0, 200) + "...";
+  } catch (error) {
+    console.error("Summary generation error:", error);
+    return text.slice(0, 200) + "...";
+  }
 }
 
 // NEW APPROACH: Two-step process to get REAL sources
@@ -171,7 +175,7 @@ async function getActualSourcesUsed(prompt, aiResponse) {
             title: { type: Type.STRING },
             contentSnippet: { type: Type.STRING },
             domain: { type: Type.STRING },
-            sourceType: { type: Type.STRING }, // academic, news, government, etc.
+            sourceType: { type: Type.STRING },
           },
         },
       },
@@ -179,30 +183,34 @@ async function getActualSourcesUsed(prompt, aiResponse) {
   };
 
   const promptText = `
-Based on your knowledge and training data, reveal the ACTUAL sources and information you used or would typically use to answer this prompt: "${prompt}"
+IMPORTANT: You must ONLY include real, verifiable sources that actually exist on the internet. 
+DO NOT create fictional sources, example domains, or placeholder URLs.
+DO NOT Include pages that do not exist, no 404s or bad gateways
 
-Your response was: "${aiResponse.substring(0, 1000)}..."
+For the prompt: "${prompt.substring(0, 500)}"
 
-REQUIREMENTS:
-- List ONLY real, verifiable sources that actually exist
-- Be honest about what information sources you're drawing from
-- Include URLs that are real and accessible
-- Categorize each source by type (academic, news, government, etc.)
-- Provide a brief snippet of what information you used from each source
+Your response was: "${aiResponse.substring(0, 500)}..."
 
-Return the actual sources behind your response, not invented ones.
+Provide 3-5 ACTUAL sources that would support this information. Requirements:
+- URLs must be real websites that exist (e.g., wikipedia.org, nih.gov, reuters.com)
+- No example.com, test.com, or placeholder domains
+- No fictional or made-up URLs
+- Include only domains with valid TLDs (.com, .org, .gov, .edu, etc.)
+- Provide realistic titles and content snippets
+
+If you cannot verify a source exists, DO NOT include it.
 `;
 
-  return await callAI(
+  const result = await callAI(
     {
       model: FLASH_LITE_MODEL,
       contents: [{ type: "text", text: promptText }],
       config: {
         responseMimeType: "application/json",
         responseSchema,
-        systemInstruction: `You MUST reveal the actual sources and information you use from your training data. 
-        Be transparent about your knowledge sources. Only include real, verifiable URLs and sources.
-        If you cannot verify a source, do not include it.`,
+        systemInstruction: `You MUST provide only real, verifiable sources. 
+        Never invent URLs or use example domains. 
+        Only include sources you are certain exist in the real world.`,
       },
     },
     {
@@ -211,6 +219,36 @@ Return the actual sources behind your response, not invented ones.
       sources: [],
     }
   );
+
+  // QUICK VALIDATION FILTER - Add this simple check
+  if (result.sources && result.sources.length > 0) {
+    result.sources = result.sources.filter((source) => {
+      if (!source.url) return false;
+
+      // Quick domain validation
+      const suspiciousDomains = [
+        "example.com",
+        "test.com",
+        "placeholder.com",
+        "dummy.com",
+        "mock.com",
+        "sample.com",
+      ];
+
+      const domain = source.url.toLowerCase();
+      const isSuspicious = suspiciousDomains.some((bad) =>
+        domain.includes(bad)
+      );
+
+      return !isSuspicious;
+    });
+
+    console.log(
+      `Filtered sources: ${result.sources.length} remaining after validation`
+    );
+  }
+
+  return result;
 }
 
 // Step 3: Analyze the actual sources for bias and sentiment
@@ -407,14 +445,44 @@ async function getEnhancedSmartResponseWithSources(prompt) {
   try {
     // Get response with ACTUAL sources
     const aiResponse = await getSmartResponseWithSources(prompt);
-    if (!aiResponse) return null;
+    if (!aiResponse) {
+      console.error("No AI response received");
+      return await getFallbackResponse(prompt);
+    }
 
-    // Get comprehensive bias analysis
-    const biasInsights = await getBiasAnalysisInsights(aiResponse);
+    // Ensure sources array exists
+    if (!aiResponse.sources) {
+      aiResponse.sources = [];
+    }
 
-    // Calculate additional metrics
+    // Calculate additional metrics with safety checks
     const sourceMetrics = calculateSourceMetrics(aiResponse.sources);
+
+    // Ensure required fields exist
+    if (!aiResponse.neutralityScore) aiResponse.neutralityScore = 0.5;
+    if (!aiResponse.persuasionScore) aiResponse.persuasionScore = 0.5;
+
     const researchQuality = assessResearchQuality(aiResponse, sourceMetrics);
+
+    // Get comprehensive bias analysis (optional - can be skipped if failing)
+    let biasInsights;
+    try {
+      biasInsights = await getBiasAnalysisInsights(aiResponse);
+    } catch (biasError) {
+      console.error("Bias analysis failed, using default:", biasError);
+      biasInsights = {
+        overallAssessment: "Analysis unavailable",
+        keyFindings: ["Consider verifying information with additional sources"],
+        criticalThinkingQuestions: ["What perspectives might be missing?"],
+        researchSuggestions: ["Verify claims with primary sources"],
+        confidenceLevel: "medium",
+        biasIndicators: {
+          languagePatterns: ["Unable to analyze"],
+          perspectiveGaps: ["Check source diversity manually"],
+          sourceDiversity: "unknown",
+        },
+      };
+    }
 
     return {
       // Response with actual sources
@@ -440,12 +508,15 @@ async function getEnhancedSmartResponseWithSources(prompt) {
 
 // Helper function to calculate source metrics
 function calculateSourceMetrics(sources) {
-  if (!sources || sources.length === 0) {
+  if (!sources || !Array.isArray(sources) || sources.length === 0) {
     return {
       neutralityRange: { min: 0, max: 0, average: 0 },
       sentimentRange: { min: 0, max: 0, average: 0 },
+      credibilityRange: { min: 0, max: 0, average: 0 },
       diversityScore: 0,
       scoreVariance: 0,
+      balancedPerspectives: false,
+      sourceTypes: {},
     };
   }
 
@@ -482,6 +553,11 @@ function calculateSourceMetrics(sources) {
 // Count different types of sources
 function countSourceTypes(sources) {
   const types = {};
+
+  if (!sources || !Array.isArray(sources)) {
+    return types;
+  }
+
   sources.forEach((source) => {
     const type = source.sourceType || "unknown";
     types[type] = (types[type] || 0) + 1;
@@ -491,14 +567,18 @@ function countSourceTypes(sources) {
 
 // Helper function to assess research quality
 function assessResearchQuality(aiResponse, sourceMetrics) {
-  const { neutralityScore, persuasionScore, sources } = aiResponse;
   const {
-    neutralityRange,
-    diversityScore,
-    scoreVariance,
-    credibilityRange,
-    sourceTypes,
-  } = sourceMetrics;
+    neutralityScore = 0.5,
+    persuasionScore = 0.5,
+    sources = [],
+  } = aiResponse;
+  const {
+    neutralityRange = { min: 0, max: 0, average: 0.5 },
+    diversityScore = 0,
+    scoreVariance = 0,
+    credibilityRange = { average: 0.5 },
+    sourceTypes = {},
+  } = sourceMetrics || {};
 
   let qualityScore = 0;
   const factors = [];
@@ -528,10 +608,11 @@ function assessResearchQuality(aiResponse, sourceMetrics) {
   }
 
   // Factor 4: Source credibility
-  if (credibilityRange.average > 0.7) {
+  const credibilityAvg = credibilityRange?.average || 0.5;
+  if (credibilityAvg > 0.7) {
     qualityScore += 0.25;
     factors.push("High source credibility");
-  } else if (credibilityRange.average > 0.5) {
+  } else if (credibilityAvg > 0.5) {
     qualityScore += 0.15;
     factors.push("Moderate source credibility");
   }
