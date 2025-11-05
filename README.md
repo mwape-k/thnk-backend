@@ -61,7 +61,6 @@ THNK transforms how users approach research by making bias analysis accessible, 
    ```bash
    npm run dev
    ```
-Here's the markdown section for Railway deployment that you can add to your README:
 
 ## 3 Deployment
 
@@ -139,5 +138,3 @@ REACT_APP_API_URL=https://your-app-name.up.railway.app/api
 Access your application logs through:
 - Railway Dashboard → Your App → Logs
 - Real-time deployment status and error tracking
-
-This deployment setup ensures your THNK backend is production-ready with minimal configuration overhead!
