@@ -1,5 +1,4 @@
-<img width="1920" height="1080" alt="PITCH BANNER" src="https://github.com/user-attachments/assets/18da6db6-b841-4e93-9cb9-080f31f7b0da" />
-
+<img width="1920" height="684" alt="PITCH BANNER-bank" src="https://github.com/user-attachments/assets/5515a36e-29b5-4929-bb82-fbb66edab01d" />
 <h1 align="center">THNK.</h1>
 <h4 align="center">Backend Repo • <a href="https://github.com/mwape-k/thnk-frontend">Backend Repo</a></h4>
 
@@ -20,7 +19,7 @@ Built with a modern tech stack focusing on real-time analysis and intuitive visu
 
 THNK transforms how users approach research by making bias analysis accessible, educational, and actionable.
 
-### 1.2 Built With 
+### 1 Built With 
 
 **Backend & APIs**  
 ![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white) ![Express.js](https://img.shields.io/badge/Express.js-000000?style=for-the-badge&logo=express&logoColor=white) ![MongoDB](https://img.shields.io/badge/MongoDB-47A248?style=for-the-badge&logo=mongodb&logoColor=white) ![Google Gemini](https://img.shields.io/badge/Google_Gemini-4285F4?style=for-the-badge&logo=google&logoColor=white)
@@ -32,12 +31,14 @@ THNK transforms how users approach research by making bias analysis accessible, 
 
 ## Getting Started
 
-### 2.1 Prerequisites
+### 2 Prerequisites
 
 - ![Node.js](https://img.shields.io/badge/Node.js-18+-339933?style=flat-square&logo=nodedotjs&logoColor=white) Version 18 or higher  
 - ![MongoDB](https://img.shields.io/badge/MongoDB-6.0+-47A248?style=flat-square&logo=mongodb&logoColor=white) Local or Atlas instance
 - ![Google Gemini API](https://img.shields.io/badge/Gemini_API-4285F4?style=flat-square&logo=google&logoColor=white) API key for AI analysis
 - ![Firebase](https://img.shields.io/badge/Firebase-FFCA28?style=flat-square&logo=firebase&logoColor=black) Project for authentication
+
+### 2 Installation Steps
 1. Clone the repository:
    ```bash
    git clone https://github.com/your-username/thnk.git
