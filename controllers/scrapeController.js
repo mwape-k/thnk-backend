@@ -8,18 +8,16 @@ exports.scrapeAndSave = async (req, res) => {
   if (!url) return res.status(400).json({ error: "URL required" });
 
   try {
-    // Scrape and AI-enhance content (summary, tags, sentiment, neutrality)
+    // STEP 1: Scrape website content
     const result = await scrapeWebsite(url);
     if (!result) return res.status(500).json({ error: "Scraping failed" });
 
-    // Save scraped and AI enriched content
+    // STEP 2: Save scraped content to database
     const content = new ScrapedContent(result);
     await content.save();
 
-    // Use authenticated user's ID or fallback
+    // STEP 3: Save to search history
     const userId = req.user?.uid || "testUser123";
-
-    // Save to search history using the service
     await saveSearchHistory(userId, url, [content._id]);
 
     res.json(content);
@@ -34,15 +32,16 @@ exports.deeperScrape = async (req, res) => {
   if (!url) return res.status(400).json({ error: "URL required" });
 
   try {
-    // Perform deeper scraping
+    // STEP 1: Perform deeper scraping with enhanced AI analysis
     const result = await deeperScrapeWebsite(url);
-    if (!result)
+    if (!result) {
       return res.status(404).json({
         error:
           "Unable to scrape the provided URL. The site may be blocking requests or the URL may be invalid.",
       });
+    }
 
-    // Save to search history with the deeperScrape result
+    // STEP 2: Save to search history
     const userId = req.user?.uid || "testUser123";
     await saveSearchHistory(userId, url, result);
 

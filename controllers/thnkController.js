@@ -2,12 +2,10 @@ const {
   getNeutralityAndSentiment,
   getTagsFromAI,
   getGenSummary,
-  getSmartResponseWithSources,
   getEnhancedSmartResponseWithSources,
 } = require("../services/aiServices");
 
-const { scrapeWebsite, deeperScrapeWebsite } = require("../services/scrapper");
-const ScrapedContent = require("../models/ScrapedContent");
+const { scrapeWebsite } = require("../services/scrapper");
 const { saveSearchHistory } = require("../services/userHistory");
 
 // Handler for neutrality & sentiment analysis
@@ -49,32 +47,32 @@ exports.generateSummary = async (req, res) => {
   }
 };
 
-// For prompt questions
+// For prompt questions with enhanced source validation
 exports.deepDive = async (req, res) => {
   const { prompt } = req.body;
   if (!prompt) return res.status(400).json({ error: "Prompt is required" });
   try {
-    const summaries = await getDeepDiveSummaries(prompt);
-    res.json({ summaries });
+    const result = await getEnhancedSmartResponseWithSources(prompt);
+    res.json(result);
   } catch (error) {
     console.error("Deep dive failed:", error.message);
     res.status(500).json({ error: "Deep dive generation failed" });
   }
 };
 
-// For prompt questions
+// Basic query handler
 exports.queryHandle = async (req, res) => {
   const { prompt } = req.body;
   if (!prompt) return res.status(400).json({ error: "Prompt is required" });
 
   try {
-    // Step 1: Get smart summary based on prompt
+    // STEP 1: Get summary
     const summary = await getGenSummary(prompt);
 
-    // Step 2: Get tags for the summary or prompt
+    // STEP 2: Get tags
     const tags = await getTagsFromAI(summary);
 
-    // Step 3: Get neutrality/sentiment scores
+    // STEP 3: Get neutrality/sentiment scores
     const { neutralityScore, sentimentScore } = await getNeutralityAndSentiment(
       summary
     );
@@ -83,7 +81,7 @@ exports.queryHandle = async (req, res) => {
       summary,
       tags,
       neutralityScore,
-      sentimentScore, // Consistent with getNeutralityAndSentiment return
+      sentimentScore,
     });
   } catch (error) {
     console.error("Query handle error:", error.message);
@@ -91,19 +89,37 @@ exports.queryHandle = async (req, res) => {
   }
 };
 
-//main controller for prompt handling
+// URL scraping endpoint
+exports.scrapeUrl = async (req, res) => {
+  const { url } = req.body;
+  if (!url) return res.status(400).json({ error: "URL is required" });
+  try {
+    const result = await scrapeWebsite(url);
+    if (!result) {
+      return res
+        .status(404)
+        .json({ error: "URL scraping failed or no content found" });
+    }
+    res.json(result);
+  } catch (error) {
+    console.error("URL scraping error:", error.message);
+    res.status(500).json({ error: "URL scraping failed" });
+  }
+};
+
+// Main controller for prompt handling with enhanced source validation
 exports.processUserPrompt = async (req, res) => {
   const { prompt } = req.body;
   if (!prompt) return res.status(400).json({ error: "Prompt is required" });
 
   try {
-    // Step 1: using enhanced smart response instead of basic one
+    // STEP 1: Get enhanced response with validated sources
     const enhancedResponse = await getEnhancedSmartResponseWithSources(prompt);
     if (!enhancedResponse) {
       return res.status(500).json({ error: "Failed to get AI response" });
     }
 
-    //step 2: Process and return the enhanced response
+    // STEP 2: Process sources for response
     const processedSources = enhancedResponse.sources.map((source) => ({
       url: source.url,
       title: source.title,
@@ -111,10 +127,15 @@ exports.processUserPrompt = async (req, res) => {
       tags: source.tags,
       neutralityScore: source.neutralityScore,
       sentimentScore: source.sentimentScore,
-      aiGenerated: true,
+      credibilityScore: source.credibilityScore,
+      domain: source.domain,
+      sourceType: source.sourceType,
+      verified: source.verified,
+      predefined: source.predefined,
+      aiGenerated: false,
     }));
 
-    // Step 3: Create response data
+    // STEP 3: Create response data
     const responseData = {
       // Core response
       summary: enhancedResponse.summary,
@@ -127,19 +148,14 @@ exports.processUserPrompt = async (req, res) => {
       sourceMetrics: enhancedResponse.sourceMetrics,
       researchQuality: enhancedResponse.researchQuality,
       quickAssessment: enhancedResponse.quickAssessment,
+      sourcesValidated: enhancedResponse.sourcesValidated,
     };
 
-    // Step 4: Save to search history BEFORE sending response
+    // STEP 4: Save to search history
     const userId = req.user?.uid || "testUser123";
+    await saveSearchHistory(userId, prompt, responseData);
 
-    // Make sure saveSearchHistory is called with correct parameters
-    await saveSearchHistory(
-      userId,
-      prompt, // The user's original prompt as query
-      responseData // The full AI response as result
-    );
-
-    // Step 5: Send response
+    // STEP 5: Send response
     res.json(responseData);
   } catch (error) {
     console.error("Error in processUserPrompt:", error);

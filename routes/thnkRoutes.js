@@ -92,7 +92,7 @@ const apiKeyCheck = require("../middleware/apiKeyCheck");
  *
  * /deep-dive:
  *   post:
- *     summary: Generate up to 6 detailed summaries with neutrality scores and sources
+ *     summary: Generate enhanced analysis with validated sources and bias insights
  *     requestBody:
  *       required: true
  *       content:
@@ -102,36 +102,60 @@ const apiKeyCheck = require("../middleware/apiKeyCheck");
  *             properties:
  *               prompt:
  *                 type: string
- *                 description: Prompt to generate deep dive summaries
+ *                 description: Prompt to generate deep dive analysis
  *     responses:
  *       200:
- *         description: Array of deep dive summaries with neutrality and sources
+ *         description: Enhanced analysis with validated sources and bias insights
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 summaries:
+ *                 summary:
+ *                   type: string
+ *                 neutralityScore:
+ *                   type: number
+ *                   format: float
+ *                 persuasionScore:
+ *                   type: number
+ *                   format: float
+ *                 sources:
  *                   type: array
  *                   items:
  *                     type: object
  *                     properties:
- *                       summary:
+ *                       url:
  *                         type: string
- *                       neutralityScore:
- *                         type: number
- *                         format: float
- *                       sources:
+ *                       title:
+ *                         type: string
+ *                       text:
+ *                         type: string
+ *                       tags:
  *                         type: array
  *                         items:
  *                           type: string
+ *                       neutralityScore:
+ *                         type: number
+ *                       sentimentScore:
+ *                         type: number
+ *                       credibilityScore:
+ *                         type: number
+ *                       verified:
+ *                         type: boolean
+ *                 biasAnalysis:
+ *                   type: object
+ *                 researchQuality:
+ *                   type: object
+ *                 sourceMetrics:
+ *                   type: object
  *       400:
  *         description: Bad request, prompt missing
+ *
  * /prompt:
  *   post:
- *     summary: Process prompt, scrape sources and save enriched content
+ *     summary: Process prompt with enhanced source validation and bias analysis
  *     security:
- *       - ApiKeyAuth: []  # if you define api key security scheme
+ *       - ApiKeyAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -141,15 +165,68 @@ const apiKeyCheck = require("../middleware/apiKeyCheck");
  *             properties:
  *               prompt:
  *                 type: string
- *                 description: User prompt to generate response & sources
+ *                 description: User prompt to generate response & validated sources
  *     responses:
  *       200:
- *         description: Saved enriched sources
+ *         description: Enhanced response with validated sources and bias analysis
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 summary:
+ *                   type: string
+ *                 neutralityScore:
+ *                   type: number
+ *                   format: float
+ *                 persuasionScore:
+ *                   type: number
+ *                   format: float
+ *                 sources:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       url:
+ *                         type: string
+ *                       title:
+ *                         type: string
+ *                       text:
+ *                         type: string
+ *                       tags:
+ *                         type: array
+ *                         items:
+ *                           type: string
+ *                       neutralityScore:
+ *                         type: number
+ *                       sentimentScore:
+ *                         type: number
+ *                       credibilityScore:
+ *                         type: number
+ *                       domain:
+ *                         type: string
+ *                       sourceType:
+ *                         type: string
+ *                       verified:
+ *                         type: boolean
+ *                       predefined:
+ *                         type: boolean
+ *                 biasAnalysis:
+ *                   type: object
+ *                 researchQuality:
+ *                   type: object
+ *                 sourceMetrics:
+ *                   type: object
+ *                 quickAssessment:
+ *                   type: object
+ *                 sourcesValidated:
+ *                   type: boolean
  *       400:
  *         description: Prompt missing or invalid
+ *
  * /query:
  *   post:
- *     summary: Process a user input query using AI
+ *     summary: Process a user input query using AI with source validation
  *     requestBody:
  *       required: true
  *       content:
@@ -159,15 +236,15 @@ const apiKeyCheck = require("../middleware/apiKeyCheck");
  *             properties:
  *               prompt:
  *                 type: string
- *                 description: The user query to process with AI
+ *                 description: The user query to process with AI and source validation
  *     responses:
  *       200:
- *         description: AI processed response
+ *         description: AI processed response with source validation
  *       400:
  *         description: Prompt missing or invalid
  */
 
-// Example in your route file
+// Only register routes for functions that actually exist in the controller
 router.post("/analyze-sentiment", thnkController.analyzeSentiment);
 router.post("/generate-tags", thnkController.generateTags);
 router.post("/generate-summary", thnkController.generateSummary);
