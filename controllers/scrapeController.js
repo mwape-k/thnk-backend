@@ -1,5 +1,8 @@
 const ScrapedContent = require("../models/ScrapedContent");
 const { scrapeWebsite, deeperScrapeWebsite } = require("../services/scrapper");
+const {
+  getEnhancedSmartResponseWithSources,
+} = require("../services/aiServices");
 const { saveSearchHistory } = require("../services/userHistory");
 const SearchHistory = require("../models/SearchHistory");
 
@@ -33,7 +36,12 @@ exports.deeperScrape = async (req, res) => {
 
   try {
     // STEP 1: Perform deeper scraping with enhanced AI analysis
-    const result = await deeperScrapeWebsite(url);
+    // Now we need to pass the AI analysis function as a parameter
+    const result = await deeperScrapeWebsite(
+      url,
+      getEnhancedSmartResponseWithSources
+    );
+
     if (!result) {
       return res.status(404).json({
         error:

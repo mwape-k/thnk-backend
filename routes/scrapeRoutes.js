@@ -5,6 +5,7 @@ const {
   scrapeAndSave,
   deeperScrape,
 } = require("../controllers/scrapeController");
+const { default: rateLimit } = require("express-rate-limit");
 
 /**
  * @swagger
